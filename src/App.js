@@ -21,7 +21,8 @@ setSubjects(data.docs.map(d => ({ ...d.data(), id: d.id })));
 };
 
 useEffect(() => {
-loadSubjects();
+  loadSubjects();
+// eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
 const markAttendance = async (s, present) => {
