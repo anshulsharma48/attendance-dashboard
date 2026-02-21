@@ -11,7 +11,6 @@ import {
 } from "firebase/auth";
 
 import { doc, getDoc, setDoc } from "firebase/firestore";
-
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function App(){
@@ -25,6 +24,7 @@ export default function App(){
   const [bulk,setBulk]=useState("");
 
   const [editing,setEditing]=useState(false);
+  const [preview,setPreview]=useState({});
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -33,27 +33,17 @@ export default function App(){
     return "Good evening";
   };
 
-  const overall = () => {
-    let a=0,t=0;
-    Object.values(subjects).forEach(s=>{
-      a+=s.attended;
-      t+=s.total;
-    });
-    return t?((a/t)*100).toFixed(1):0;
-  };
+  // ⭐ Aggregate attendance
+  const aggregateAttendance = () => {
+    const list = Object.values(subjects).filter(s => s.total > 0);
+    if(list.length===0) return 0;
 
-  const riskSubjects = () => {
-    return Object.entries(subjects).filter(([n,s])=>{
-      if(!s.total) return false;
-      return (s.attended/s.total)*100 < 75;
+    let sum=0;
+    list.forEach(s=>{
+      sum += (s.attended/s.total)*100;
     });
-  };
 
-  const recommendation = () => {
-    const risk = riskSubjects();
-    if(risk.length===0) return "You’re on track — keep attending consistently.";
-    if(risk.length<3) return "Attend upcoming classes to stay safe.";
-    return "Multiple subjects at risk — prioritize attendance.";
+    return (sum/list.length).toFixed(1);
   };
 
   const safeBunk = (attended,total) => {
@@ -143,6 +133,18 @@ export default function App(){
     saveUser(copy);
   };
 
+  const previewAttend = (name)=>{
+    const s = subjects[name];
+    const pct = ((s.attended+1)/(s.total+1))*100;
+    setPreview({...preview,[name]:`If attend → ${pct.toFixed(1)}%`});
+  };
+
+  const previewMiss = (name)=>{
+    const s = subjects[name];
+    const pct = (s.attended/(s.total+1))*100;
+    setPreview({...preview,[name]:`If miss → ${pct.toFixed(1)}%`});
+  };
+
   if(user===undefined) return <div style={{padding:40}}>Loading…</div>;
 
   if(!user){
@@ -167,7 +169,7 @@ export default function App(){
           {profile.photo && <img src={profile.photo} className="avatar" alt="" />}
           <div>
             <strong>{getGreeting()}, {profile.name||user.email}</strong>
-            <div>Overall {overall()}%</div>
+            <div>📊 Aggregate Attendance: {aggregateAttendance()}%</div>
           </div>
         </div>
 
@@ -176,16 +178,6 @@ export default function App(){
           <button onClick={logout}>Logout</button>
         </div>
       </div>
-
-      <div className="card">
-        📊 Recommendation: {recommendation()}
-      </div>
-
-      {riskSubjects().length > 0 && (
-        <div className="card" style={{background:"#fff7ed"}}>
-          ⚠️ Focus subjects: {riskSubjects().map(([n])=>n).join(", ")}
-        </div>
-      )}
 
       {editing && (
         <div className="card">
@@ -203,19 +195,27 @@ export default function App(){
       {Object.keys(subjects).map(name=>{
         const s=subjects[name];
         const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
-        const attendNext=((s.attended+1)/(s.total+1)*100).toFixed(1);
-        const missNext=(s.attended/(s.total+1)*100).toFixed(1);
 
         return (
           <div key={name} className="card">
             <h3>{name}</h3>
             <div>{s.attended}/{s.total} — {pct}%</div>
-            <div>If attend → {attendNext}% | If miss → {missNext}%</div>
+
             <div style={{fontSize:13,color:"#555"}}>
               {safeBunk(s.attended,s.total)>0
                 ? `You can miss ${safeBunk(s.attended,s.total)} classes safely`
                 : "You must attend upcoming classes"}
             </div>
+
+            {preview[name] && (
+              <div style={{marginTop:6,fontSize:13,color:"#2563eb"}}>
+                {preview[name]}
+              </div>
+            )}
+
+            <button onClick={()=>previewAttend(name)}>Preview Attend</button>
+            <button onClick={()=>previewMiss(name)}>Preview Miss</button>
+
             <button onClick={()=>mark(name,true)}>Present</button>
             <button onClick={()=>mark(name,false)}>Absent</button>
             <button onClick={()=>undo(name)}>Undo</button>
