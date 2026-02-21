@@ -4,7 +4,6 @@ import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 
 export default function App() {
 const [subjects, setSubjects] = useState([]);
-const [todayMarked, setTodayMarked] = useState(false);
 
 const target = 75;
 const ref = collection(db, "subjects");
@@ -26,10 +25,31 @@ const r = doc(db, "subjects", s.id);
 await updateDoc(r, {
   attended: s.attended + (present ? 1 : 0),
   total: s.total + 1,
-  history: [...s.history, present ? "✅" : "❌"]
+  history: [...(s.history || []), present ? "✅" : "❌"]
 });
 
-setTodayMarked(true);
+loadSubjects();
+
+
+};
+
+const undoLast = async (s) => {
+if (!s.history || s.history.length === 0) return;
+
+
+const last = s.history[s.history.length - 1];
+const newHistory = s.history.slice(0, -1);
+
+const attendedChange = last === "✅" ? -1 : 0;
+
+const r = doc(db, "subjects", s.id);
+
+await updateDoc(r, {
+  attended: s.attended + attendedChange,
+  total: s.total - 1,
+  history: newHistory
+});
+
 loadSubjects();
 
 
@@ -48,39 +68,38 @@ subjects.length
 return (
 <div style={{
 minHeight: "100vh",
-background: "#f8fafc",
-fontFamily: "-apple-system, BlinkMacSystemFont, system-ui"
+background: "linear-gradient(180deg,#eef2ff,#f8fafc)",
+fontFamily: "-apple-system, system-ui"
 }}>
 
 
   {/* HERO */}
   <div style={{
-    background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+    padding: 28,
+    background: "linear-gradient(135deg,#6366f1,#7c3aed)",
     color: "white",
-    padding: "32px 20px",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    boxShadow: "0 20px 60px rgba(99,102,241,0.3)"
   }}>
-    <h2 style={{ margin: 0 }}>Attendance</h2>
-    <p style={{ opacity: 0.9 }}>Your daily tracker</p>
-
+    <h2 style={{ marginBottom: 6 }}>Attendance</h2>
     <div style={{
-      marginTop: 20,
       background: "rgba(255,255,255,0.15)",
       padding: 20,
-      borderRadius: 16,
-      backdropFilter: "blur(10px)"
+      borderRadius: 20,
+      backdropFilter: "blur(12px)"
     }}>
-      <p style={{ margin: 0 }}>Total Attendance</p>
-      <h1 style={{ margin: 0 }}>{totalAttendance}%</h1>
-      <small>{todayMarked ? "Updated today" : "Mark today"}</small>
+      <div style={{ opacity: 0.85 }}>Total Attendance</div>
+      <div style={{ fontSize: 48, fontWeight: 700 }}>
+        {totalAttendance}%
+      </div>
     </div>
   </div>
 
-  {/* SUBJECT LIST */}
+  {/* SUBJECTS */}
   <div style={{ padding: 20 }}>
     {subjects.map(s => {
-      const p = percent(s.attended, s.total).toFixed(1);
+      const p = percent(s.attended, s.total);
       const low = p < target;
 
       const attendNext =
@@ -88,21 +107,56 @@ fontFamily: "-apple-system, BlinkMacSystemFont, system-ui"
 
       return (
         <div key={s.id} style={card}>
+
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <strong>{s.name}</strong>
-            <span style={{ color: low ? "#ef4444" : "#22c55e" }}>
-              {p}%
+
+            <span style={{
+              background: low ? "#fee2e2" : "#dcfce7",
+              color: low ? "#b91c1c" : "#15803d",
+              padding: "4px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600
+            }}>
+              {low ? "Attention" : "On Track"}
             </span>
           </div>
 
-          <div style={{ marginTop: 6, fontSize: 13 }}>
-            If attend next → {attendNext}%
+          <div style={{ marginTop: 8 }}>
+            {s.attended} / {s.total} classes
           </div>
 
-          <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+          <div style={{
+            marginTop: 10,
+            height: 10,
+            background: "#e5e7eb",
+            borderRadius: 999,
+            overflow: "hidden"
+          }}>
+            <div style={{
+              width: `${p}%`,
+              background: low
+                ? "linear-gradient(90deg,#ef4444,#fb7185)"
+                : "linear-gradient(90deg,#22c55e,#4ade80)",
+              height: "100%"
+            }} />
+          </div>
+
+          <div style={{ marginTop: 6 }}>
+            {p.toFixed(1)}%
+          </div>
+
+          <div style={{ marginTop: 6, fontSize: 13 }}>
+            Next attend → {attendNext}%
+          </div>
+
+          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
             <button style={presentBtn} onClick={() => markAttendance(s, true)}>Present</button>
             <button style={absentBtn} onClick={() => markAttendance(s, false)}>Absent</button>
+            <button style={undoBtn} onClick={() => undoLast(s)}>Undo</button>
           </div>
+
         </div>
       );
     })}
@@ -110,15 +164,16 @@ fontFamily: "-apple-system, BlinkMacSystemFont, system-ui"
 
 </div>
 
+
 );
 }
 
 const card = {
 background: "white",
-padding: 16,
-borderRadius: 16,
-marginBottom: 14,
-boxShadow: "0 10px 24px rgba(0,0,0,0.08)"
+padding: 20,
+borderRadius: 24,
+marginBottom: 18,
+boxShadow: "0 18px 50px rgba(0,0,0,0.08)"
 };
 
 const presentBtn = {
@@ -127,7 +182,7 @@ background: "#22c55e",
 color: "white",
 border: "none",
 padding: "12px",
-borderRadius: 12,
+borderRadius: 14,
 fontWeight: 600
 };
 
@@ -137,6 +192,15 @@ background: "#ef4444",
 color: "white",
 border: "none",
 padding: "12px",
-borderRadius: 12,
+borderRadius: 14,
 fontWeight: 600
+};
+
+const undoBtn = {
+background: "#f3f4f6",
+color: "#374151",
+border: "none",
+padding: "12px",
+borderRadius: 14,
+fontSize: 12
 };
