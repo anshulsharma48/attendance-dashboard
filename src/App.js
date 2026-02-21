@@ -1,206 +1,228 @@
-import React, { useState, useEffect } from "react";
-import { db } from "./firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import "./index.css";
 
-export default function App() {
-const [subjects, setSubjects] = useState([]);
+import { auth, db, storage } from "./firebase";
 
-const target = 75;
-const ref = collection(db, "subjects");
+import {
+  onAuthStateChanged,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from "firebase/auth";
 
-const loadSubjects = async () => {
-const data = await getDocs(ref);
-setSubjects(data.docs.map(d => ({ ...d.data(), id: d.id })));
-};
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
-useEffect(() => {
-loadSubjects();
-// eslint-disable-next-line
-}, []);
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-const markAttendance = async (s, present) => {
-const r = doc(db, "subjects", s.id);
+export default function App(){
 
+  const [user,setUser]=useState(undefined);
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
 
-await updateDoc(r, {
-  attended: s.attended + (present ? 1 : 0),
-  total: s.total + 1,
-  history: [...(s.history || []), present ? "✅" : "❌"]
-});
+  const [profile,setProfile]=useState({name:"",photo:""});
+  const [subjects,setSubjects]=useState({});
+  const [bulk,setBulk]=useState("");
 
-loadSubjects();
+  const [editing,setEditing]=useState(false);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
 
-};
+  const overall = () => {
+    let a=0,t=0;
+    Object.values(subjects).forEach(s=>{
+      a+=s.attended;
+      t+=s.total;
+    });
+    return t?((a/t)*100).toFixed(1):0;
+  };
 
-const undoLast = async (s) => {
-if (!s.history || s.history.length === 0) return;
+  const riskSubjects = () => {
+    return Object.entries(subjects).filter(([n,s])=>{
+      if(!s.total) return false;
+      return (s.attended/s.total)*100 < 75;
+    });
+  };
 
+  const recommendation = () => {
+    const risk = riskSubjects();
+    if(risk.length===0) return "You’re on track — keep attending consistently.";
+    if(risk.length<3) return "Attend upcoming classes to stay safe.";
+    return "Multiple subjects at risk — prioritize attendance.";
+  };
 
-const last = s.history[s.history.length - 1];
-const newHistory = s.history.slice(0, -1);
+  const safeBunk = (attended,total) => {
+    if(total===0) return 0;
+    let bunk=0;
+    while((attended/(total+bunk))>=0.75){
+      bunk++;
+    }
+    return bunk-1;
+  };
 
-const attendedChange = last === "✅" ? -1 : 0;
+  useEffect(()=>{
+    return onAuthStateChanged(auth, async u=>{
+      if(u){
+        setUser(u);
+        await loadUser(u.uid);
+      }else setUser(null);
+    });
+  },[]);
 
-const r = doc(db, "subjects", s.id);
+  const loadUser = async(uid)=>{
+    const snap = await getDoc(doc(db,"users",uid));
+    if(snap.exists()){
+      setProfile({name:snap.data().name||"",photo:snap.data().photo||""});
+      setSubjects(snap.data().subjects||{});
+    }
+  };
 
-await updateDoc(r, {
-  attended: s.attended + attendedChange,
-  total: s.total - 1,
-  history: newHistory
-});
+  const saveUser = async(updatedSubjects=subjects,updatedProfile=profile)=>{
+    await setDoc(doc(db,"users",user.uid),{
+      name:updatedProfile.name,
+      photo:updatedProfile.photo,
+      subjects:updatedSubjects
+    });
+    setSubjects(updatedSubjects);
+    setProfile(updatedProfile);
+  };
 
-loadSubjects();
+  const login = async ()=>{
+    try{ await signInWithEmailAndPassword(auth,email,password); }
+    catch(e){ alert(e.message); }
+  };
 
+  const signup = async ()=>{
+    try{
+      const res = await createUserWithEmailAndPassword(auth,email,password);
+      await setDoc(doc(db,"users",res.user.uid),{name:"",photo:"",subjects:{}});
+    }catch(e){ alert(e.message); }
+  };
 
-};
+  const logout = ()=> signOut(auth);
 
-const percent = (a, t) => t > 0 ? (a / t) * 100 : 0;
+  const uploadPhoto = async e=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    const storageRef = ref(storage,`profiles/${user.uid}`);
+    await uploadBytes(storageRef,file);
+    const url = await getDownloadURL(storageRef);
+    saveUser(subjects,{...profile,photo:url});
+  };
 
-const totalAttendance =
-subjects.length > 0
-? (
-subjects.reduce((sum, s) => sum + percent(s.attended, s.total), 0) /
-subjects.length
-).toFixed(1)
-: 0;
+  const addBulk=()=>{
+    const list=bulk.split("\n").filter(Boolean);
+    const copy={...subjects};
+    list.forEach(s=>{
+      if(!copy[s]) copy[s]={attended:0,total:0,history:[]};
+    });
+    saveUser(copy);
+    setBulk("");
+  };
 
-return (
-<div style={{
-minHeight: "100vh",
-background: "linear-gradient(180deg,#eef2ff,#f8fafc)",
-fontFamily: "-apple-system, system-ui"
-}}>
+  const mark=(name,present)=>{
+    const copy={...subjects};
+    copy[name].total++;
+    if(present) copy[name].attended++;
+    copy[name].history.push(present);
+    saveUser(copy);
+  };
 
+  const undo=name=>{
+    const copy={...subjects};
+    const last=copy[name].history.pop();
+    if(last!==undefined){
+      copy[name].total--;
+      if(last) copy[name].attended--;
+    }
+    saveUser(copy);
+  };
 
-  {/* HERO */}
-  <div style={{
-    padding: 28,
-    background: "linear-gradient(135deg,#6366f1,#7c3aed)",
-    color: "white",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    boxShadow: "0 20px 60px rgba(99,102,241,0.3)"
-  }}>
-    <h2 style={{ marginBottom: 6 }}>Attendance</h2>
-    <div style={{
-      background: "rgba(255,255,255,0.15)",
-      padding: 20,
-      borderRadius: 20,
-      backdropFilter: "blur(12px)"
-    }}>
-      <div style={{ opacity: 0.85 }}>Total Attendance</div>
-      <div style={{ fontSize: 48, fontWeight: 700 }}>
-        {totalAttendance}%
-      </div>
-    </div>
-  </div>
+  if(user===undefined) return <div style={{padding:40}}>Loading…</div>;
 
-  {/* SUBJECTS */}
-  <div style={{ padding: 20 }}>
-    {subjects.map(s => {
-      const p = percent(s.attended, s.total);
-      const low = p < target;
-
-      const attendNext =
-        (((s.attended + 1) / (s.total + 1)) * 100).toFixed(1);
-
-      return (
-        <div key={s.id} style={card}>
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <strong>{s.name}</strong>
-
-            <span style={{
-              background: low ? "#fee2e2" : "#dcfce7",
-              color: low ? "#b91c1c" : "#15803d",
-              padding: "4px 10px",
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 600
-            }}>
-              {low ? "Attention" : "On Track"}
-            </span>
-          </div>
-
-          <div style={{ marginTop: 8 }}>
-            {s.attended} / {s.total} classes
-          </div>
-
-          <div style={{
-            marginTop: 10,
-            height: 10,
-            background: "#e5e7eb",
-            borderRadius: 999,
-            overflow: "hidden"
-          }}>
-            <div style={{
-              width: `${p}%`,
-              background: low
-                ? "linear-gradient(90deg,#ef4444,#fb7185)"
-                : "linear-gradient(90deg,#22c55e,#4ade80)",
-              height: "100%"
-            }} />
-          </div>
-
-          <div style={{ marginTop: 6 }}>
-            {p.toFixed(1)}%
-          </div>
-
-          <div style={{ marginTop: 6, fontSize: 13 }}>
-            Next attend → {attendNext}%
-          </div>
-
-          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-            <button style={presentBtn} onClick={() => markAttendance(s, true)}>Present</button>
-            <button style={absentBtn} onClick={() => markAttendance(s, false)}>Absent</button>
-            <button style={undoBtn} onClick={() => undoLast(s)}>Undo</button>
-          </div>
-
+  if(!user){
+    return (
+      <div className="auth-wrapper">
+        <div className="auth-card">
+          <h2>Attendance Tracker</h2>
+          <input placeholder="Email" onChange={e=>setEmail(e.target.value)} />
+          <input type="password" placeholder="Password" onChange={e=>setPassword(e.target.value)} />
+          <button onClick={login}>Login</button>
+          <button onClick={signup}>Create account</button>
         </div>
-      );
-    })}
-  </div>
+      </div>
+    );
+  }
 
-</div>
+  return (
+    <div className="container">
 
+      <div className="header">
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {profile.photo && <img src={profile.photo} className="avatar" alt="" />}
+          <div>
+            <strong>{getGreeting()}, {profile.name||user.email}</strong>
+            <div>Overall {overall()}%</div>
+          </div>
+        </div>
 
-);
+        <div>
+          <button onClick={()=>setEditing(!editing)}>Edit Profile</button>
+          <button onClick={logout}>Logout</button>
+        </div>
+      </div>
+
+      <div className="card">
+        📊 Recommendation: {recommendation()}
+      </div>
+
+      {riskSubjects().length > 0 && (
+        <div className="card" style={{background:"#fff7ed"}}>
+          ⚠️ Focus subjects: {riskSubjects().map(([n])=>n).join(", ")}
+        </div>
+      )}
+
+      {editing && (
+        <div className="card">
+          <input value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/>
+          <input type="file" accept="image/png,image/jpeg" onChange={uploadPhoto}/>
+          <button onClick={()=>saveUser()}>Save</button>
+        </div>
+      )}
+
+      <div className="card">
+        <textarea value={bulk} onChange={e=>setBulk(e.target.value)} placeholder="Bulk subjects"/>
+        <button onClick={addBulk}>Add Subjects</button>
+      </div>
+
+      {Object.keys(subjects).map(name=>{
+        const s=subjects[name];
+        const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
+        const attendNext=((s.attended+1)/(s.total+1)*100).toFixed(1);
+        const missNext=(s.attended/(s.total+1)*100).toFixed(1);
+
+        return (
+          <div key={name} className="card">
+            <h3>{name}</h3>
+            <div>{s.attended}/{s.total} — {pct}%</div>
+            <div>If attend → {attendNext}% | If miss → {missNext}%</div>
+            <div style={{fontSize:13,color:"#555"}}>
+              {safeBunk(s.attended,s.total)>0
+                ? `You can miss ${safeBunk(s.attended,s.total)} classes safely`
+                : "You must attend upcoming classes"}
+            </div>
+            <button onClick={()=>mark(name,true)}>Present</button>
+            <button onClick={()=>mark(name,false)}>Absent</button>
+            <button onClick={()=>undo(name)}>Undo</button>
+          </div>
+        );
+      })}
+
+    </div>
+  );
 }
-
-const card = {
-background: "white",
-padding: 20,
-borderRadius: 24,
-marginBottom: 18,
-boxShadow: "0 18px 50px rgba(0,0,0,0.08)"
-};
-
-const presentBtn = {
-flex: 1,
-background: "#22c55e",
-color: "white",
-border: "none",
-padding: "12px",
-borderRadius: 14,
-fontWeight: 600
-};
-
-const absentBtn = {
-flex: 1,
-background: "#ef4444",
-color: "white",
-border: "none",
-padding: "12px",
-borderRadius: 14,
-fontWeight: 600
-};
-
-const undoBtn = {
-background: "#f3f4f6",
-color: "#374151",
-border: "none",
-padding: "12px",
-borderRadius: 14,
-fontSize: 12
-};
