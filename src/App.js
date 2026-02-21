@@ -1,3 +1,5 @@
+// FULL SAFE UPGRADE — Classes needed + Ranking + Timeline + Heatmap
+
 import React, { useEffect, useState } from "react";
 import "./index.css";
 
@@ -33,7 +35,6 @@ export default function App(){
     return "Good evening";
   };
 
-  // ⭐ Aggregate attendance
   const aggregateAttendance = () => {
     const list = Object.values(subjects).filter(s => s.total > 0);
     if(list.length===0) return 0;
@@ -54,6 +55,21 @@ export default function App(){
     }
     return bunk-1;
   };
+
+  const classesTo75 = (attended,total) => {
+    if(total===0) return 0;
+    let x=0;
+    while((attended+x)/(total+x) < 0.75){
+      x++;
+    }
+    return x;
+  };
+
+  const rankedSubjects = Object.entries(subjects).sort((a,b)=>{
+    const pa = a[1].total ? a[1].attended/a[1].total : 0;
+    const pb = b[1].total ? b[1].attended/b[1].total : 0;
+    return pb-pa;
+  });
 
   useEffect(()=>{
     return onAuthStateChanged(auth, async u=>{
@@ -179,6 +195,14 @@ export default function App(){
         </div>
       </div>
 
+      <div className="card">
+        <h3>🏆 Subject Ranking</h3>
+        {rankedSubjects.map(([name,s],i)=>{
+          const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
+          return <div key={name}>{i+1}. {name} — {pct}%</div>;
+        })}
+      </div>
+
       {editing && (
         <div className="card">
           <input value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/>
@@ -201,17 +225,19 @@ export default function App(){
             <h3>{name}</h3>
             <div>{s.attended}/{s.total} — {pct}%</div>
 
-            <div style={{fontSize:13,color:"#555"}}>
-              {safeBunk(s.attended,s.total)>0
-                ? `You can miss ${safeBunk(s.attended,s.total)} classes safely`
-                : "You must attend upcoming classes"}
+            <div>
+              {classesTo75(s.attended,s.total)>0
+                ? `Need ${classesTo75(s.attended,s.total)} classes to reach 75%`
+                : "Already above 75%"}
             </div>
 
-            {preview[name] && (
-              <div style={{marginTop:6,fontSize:13,color:"#2563eb"}}>
-                {preview[name]}
-              </div>
-            )}
+            <div>
+              {safeBunk(s.attended,s.total)>0
+                ? `Can miss ${safeBunk(s.attended,s.total)} safely`
+                : "Must attend"}
+            </div>
+
+            {preview[name] && <div>{preview[name]}</div>}
 
             <button onClick={()=>previewAttend(name)}>Preview Attend</button>
             <button onClick={()=>previewMiss(name)}>Preview Miss</button>
@@ -219,6 +245,19 @@ export default function App(){
             <button onClick={()=>mark(name,true)}>Present</button>
             <button onClick={()=>mark(name,false)}>Absent</button>
             <button onClick={()=>undo(name)}>Undo</button>
+
+            <div style={{marginTop:8}}>
+              {s.history.map((h,i)=>(
+                <span key={i} style={{
+                  display:"inline-block",
+                  width:10,
+                  height:10,
+                  marginRight:2,
+                  background:h?"#16a34a":"#dc2626"
+                }}/>
+              ))}
+            </div>
+
           </div>
         );
       })}
