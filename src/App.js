@@ -12,7 +12,6 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-
 export default function App(){
 
   const [user,setUser]=useState(undefined);
@@ -25,6 +24,15 @@ export default function App(){
 
   const [editing,setEditing]=useState(false);
   const [preview,setPreview]=useState({});
+
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [shake,setShake]=useState(false);
+
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(()=>setShake(false),400);
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -84,12 +92,61 @@ export default function App(){
     setProfile(prof);
   };
 
-   const login=()=>signInWithEmailAndPassword(auth,email,password).catch(e=>alert(e.message));
-  
-  const signup=async()=>{
-    const res=await createUserWithEmailAndPassword(auth,email,password);
-    await setDoc(doc(db,"users",res.user.uid),{name:"",photo:"",subjects:{}});
+  const login = async () => {
+
+    setError("");
+    setLoading(true);
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if(!emailRegex.test(email)){
+      setError("Enter valid email");
+      triggerShake();
+      setLoading(false);
+      return;
+    }
+
+    try{
+      await signInWithEmailAndPassword(auth,email,password);
+    }catch(e){
+      setError(e.message);
+      triggerShake();
+    }
+
+    setLoading(false);
   };
+
+  const signup = async () => {
+
+    setError("");
+    setLoading(true);
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if(!emailRegex.test(email)){
+      setError("Enter valid email");
+      triggerShake();
+      setLoading(false);
+      return;
+    }
+
+    try{
+      const res = await createUserWithEmailAndPassword(auth,email,password);
+
+      await setDoc(doc(db,"users",res.user.uid),{
+        name:"",
+        photo:"",
+        subjects:{}
+      });
+
+    }catch(e){
+      setError(e.message);
+      triggerShake();
+    }
+
+    setLoading(false);
+  };
+
   const logout=()=>signOut(auth);
 
   const uploadPhoto=async e=>{
@@ -144,40 +201,31 @@ export default function App(){
   if(user===undefined) return <div style={{padding:40}}>Loading…</div>;
 
   if(!user){
-  return (
-    <div className="lamp-auth-wrapper">
+    return (
+      <div className="lamp-auth-wrapper">
 
-      <div className="lamp-light"></div>
+        <div className="lamp-light"></div>
 
-      <div className="lamp-card">
-        <h2 className="lamp-title">Login</h2>
+        <div className={`lamp-card ${shake ? "shake" : ""}`}>
+          <h2 className="lamp-title">Login</h2>
 
-        <input
-          className="lamp-input"
-          placeholder="Email"
-          onChange={e=>setEmail(e.target.value)}
-        />
+          <input className="lamp-input" placeholder="Email" onChange={e=>setEmail(e.target.value)} />
+          <input className="lamp-input" type="password" placeholder="Password" onChange={e=>setPassword(e.target.value)} />
 
-        <input
-          className="lamp-input"
-          type="password"
-          placeholder="Password"
-          onChange={e=>setPassword(e.target.value)}
-        />
+          {error && <div style={{color:"#f87171",textAlign:"center"}}>{error}</div>}
 
-        <button className="login-btn" onClick={login}>
-          Login
-        </button>
+          <button className="login-btn" onClick={login} disabled={loading}>
+            {loading ? "Signing in..." : "Login"}
+          </button>
 
-        <button className="login-btn secondary" onClick={signup}>
-          Create account
-        </button>
+          <button className="login-btn secondary" onClick={signup} disabled={loading}>
+            {loading ? "Creating..." : "Create account"}
+          </button>
+        </div>
 
       </div>
-
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div className="container">
