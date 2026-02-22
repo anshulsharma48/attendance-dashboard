@@ -1,8 +1,5 @@
-// FULL SAFE UPGRADE — Classes needed + Ranking + Timeline + Heatmap
-
 import React, { useEffect, useState } from "react";
 import "./index.css";
-
 import { auth, db, storage } from "./firebase";
 
 import {
@@ -14,6 +11,7 @@ import {
 
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 
 export default function App(){
 
@@ -38,36 +36,28 @@ export default function App(){
   const aggregateAttendance = () => {
     const list = Object.values(subjects).filter(s => s.total > 0);
     if(list.length===0) return 0;
-
     let sum=0;
-    list.forEach(s=>{
-      sum += (s.attended/s.total)*100;
-    });
-
+    list.forEach(s=> sum += (s.attended/s.total)*100);
     return (sum/list.length).toFixed(1);
   };
 
-  const safeBunk = (attended,total) => {
-    if(total===0) return 0;
-    let bunk=0;
-    while((attended/(total+bunk))>=0.75){
-      bunk++;
-    }
-    return bunk-1;
+  const safeBunk = (a,t)=>{
+    if(t===0) return 0;
+    let x=0;
+    while((a/(t+x))>=0.75) x++;
+    return x-1;
   };
 
-  const classesTo75 = (attended,total) => {
-    if(total===0) return 0;
+  const classesTo75=(a,t)=>{
+    if(t===0) return 0;
     let x=0;
-    while((attended+x)/(total+x) < 0.75){
-      x++;
-    }
+    while((a+x)/(t+x)<0.75) x++;
     return x;
   };
 
   const rankedSubjects = Object.entries(subjects).sort((a,b)=>{
-    const pa = a[1].total ? a[1].attended/a[1].total : 0;
-    const pb = b[1].total ? b[1].attended/b[1].total : 0;
+    const pa=a[1].total?a[1].attended/a[1].total:0;
+    const pb=b[1].total?b[1].attended/b[1].total:0;
     return pb-pa;
   });
 
@@ -75,49 +65,39 @@ export default function App(){
     return onAuthStateChanged(auth, async u=>{
       if(u){
         setUser(u);
-        await loadUser(u.uid);
-      }else setUser(null);
+        const snap=await getDoc(doc(db,"users",u.uid));
+        if(snap.exists()){
+          setProfile({name:snap.data().name||"",photo:snap.data().photo||""});
+          setSubjects(snap.data().subjects||{});
+        }
+      } else setUser(null);
     });
   },[]);
 
-  const loadUser = async(uid)=>{
-    const snap = await getDoc(doc(db,"users",uid));
-    if(snap.exists()){
-      setProfile({name:snap.data().name||"",photo:snap.data().photo||""});
-      setSubjects(snap.data().subjects||{});
-    }
-  };
-
-  const saveUser = async(updatedSubjects=subjects,updatedProfile=profile)=>{
+  const saveUser = async(sub=subjects,prof=profile)=>{
     await setDoc(doc(db,"users",user.uid),{
-      name:updatedProfile.name,
-      photo:updatedProfile.photo,
-      subjects:updatedSubjects
+      name:prof.name,
+      photo:prof.photo,
+      subjects:sub
     });
-    setSubjects(updatedSubjects);
-    setProfile(updatedProfile);
+    setSubjects(sub);
+    setProfile(prof);
   };
 
-  const login = async ()=>{
-    try{ await signInWithEmailAndPassword(auth,email,password); }
-    catch(e){ alert(e.message); }
+   const login=()=>signInWithEmailAndPassword(auth,email,password).catch(e=>alert(e.message));
+  
+  const signup=async()=>{
+    const res=await createUserWithEmailAndPassword(auth,email,password);
+    await setDoc(doc(db,"users",res.user.uid),{name:"",photo:"",subjects:{}});
   };
+  const logout=()=>signOut(auth);
 
-  const signup = async ()=>{
-    try{
-      const res = await createUserWithEmailAndPassword(auth,email,password);
-      await setDoc(doc(db,"users",res.user.uid),{name:"",photo:"",subjects:{}});
-    }catch(e){ alert(e.message); }
-  };
-
-  const logout = ()=> signOut(auth);
-
-  const uploadPhoto = async e=>{
+  const uploadPhoto=async e=>{
     const file=e.target.files[0];
     if(!file) return;
-    const storageRef = ref(storage,`profiles/${user.uid}`);
-    await uploadBytes(storageRef,file);
-    const url = await getDownloadURL(storageRef);
+    const r=ref(storage,`profiles/${user.uid}`);
+    await uploadBytes(r,file);
+    const url=await getDownloadURL(r);
     saveUser(subjects,{...profile,photo:url});
   };
 
@@ -131,11 +111,11 @@ export default function App(){
     setBulk("");
   };
 
-  const mark=(name,present)=>{
+  const mark=(name,p)=>{
     const copy={...subjects};
     copy[name].total++;
-    if(present) copy[name].attended++;
-    copy[name].history.push(present);
+    if(p) copy[name].attended++;
+    copy[name].history.push(p);
     saveUser(copy);
   };
 
@@ -149,33 +129,55 @@ export default function App(){
     saveUser(copy);
   };
 
-  const previewAttend = (name)=>{
-    const s = subjects[name];
-    const pct = ((s.attended+1)/(s.total+1))*100;
+  const previewAttend=name=>{
+    const s=subjects[name];
+    const pct=((s.attended+1)/(s.total+1))*100;
     setPreview({...preview,[name]:`If attend → ${pct.toFixed(1)}%`});
   };
 
-  const previewMiss = (name)=>{
-    const s = subjects[name];
-    const pct = (s.attended/(s.total+1))*100;
+  const previewMiss=name=>{
+    const s=subjects[name];
+    const pct=(s.attended/(s.total+1))*100;
     setPreview({...preview,[name]:`If miss → ${pct.toFixed(1)}%`});
   };
 
   if(user===undefined) return <div style={{padding:40}}>Loading…</div>;
 
   if(!user){
-    return (
-      <div className="auth-wrapper">
-        <div className="auth-card">
-          <h2>Attendance Tracker</h2>
-          <input placeholder="Email" onChange={e=>setEmail(e.target.value)} />
-          <input type="password" placeholder="Password" onChange={e=>setPassword(e.target.value)} />
-          <button onClick={login}>Login</button>
-          <button onClick={signup}>Create account</button>
-        </div>
+  return (
+    <div className="lamp-auth-wrapper">
+
+      <div className="lamp-light"></div>
+
+      <div className="lamp-card">
+        <h2 className="lamp-title">Login</h2>
+
+        <input
+          className="lamp-input"
+          placeholder="Email"
+          onChange={e=>setEmail(e.target.value)}
+        />
+
+        <input
+          className="lamp-input"
+          type="password"
+          placeholder="Password"
+          onChange={e=>setPassword(e.target.value)}
+        />
+
+        <button className="login-btn" onClick={login}>
+          Login
+        </button>
+
+        <button className="login-btn secondary" onClick={signup}>
+          Create account
+        </button>
+
       </div>
-    );
-  }
+
+    </div>
+  );
+}
 
   return (
     <div className="container">
@@ -195,14 +197,6 @@ export default function App(){
         </div>
       </div>
 
-      <div className="card">
-        <h3>🏆 Subject Ranking</h3>
-        {rankedSubjects.map(([name,s],i)=>{
-          const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
-          return <div key={name}>{i+1}. {name} — {pct}%</div>;
-        })}
-      </div>
-
       {editing && (
         <div className="card">
           <input value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/>
@@ -216,6 +210,14 @@ export default function App(){
         <button onClick={addBulk}>Add Subjects</button>
       </div>
 
+      <div className="card">
+        <h3>🏆 Subject Ranking</h3>
+        {rankedSubjects.map(([name,s],i)=>{
+          const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
+          return <div key={name}>{i+1}. {name} — {pct}%</div>;
+        })}
+      </div>
+
       {Object.keys(subjects).map(name=>{
         const s=subjects[name];
         const pct=s.total?((s.attended/s.total)*100).toFixed(1):0;
@@ -225,17 +227,8 @@ export default function App(){
             <h3>{name}</h3>
             <div>{s.attended}/{s.total} — {pct}%</div>
 
-            <div>
-              {classesTo75(s.attended,s.total)>0
-                ? `Need ${classesTo75(s.attended,s.total)} classes to reach 75%`
-                : "Already above 75%"}
-            </div>
-
-            <div>
-              {safeBunk(s.attended,s.total)>0
-                ? `Can miss ${safeBunk(s.attended,s.total)} safely`
-                : "Must attend"}
-            </div>
+            <div>{classesTo75(s.attended,s.total)>0 ? `Need ${classesTo75(s.attended,s.total)} classes` : "Above 75%"}</div>
+            <div>{safeBunk(s.attended,s.total)>0 ? `Can miss ${safeBunk(s.attended,s.total)}` : "Must attend"}</div>
 
             {preview[name] && <div>{preview[name]}</div>}
 

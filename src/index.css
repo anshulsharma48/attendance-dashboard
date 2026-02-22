@@ -1,82 +1,258 @@
+/* ===== GLOBAL ===== */
+
 body {
   margin: 0;
-  font-family: Inter, system-ui, sans-serif;
-  background: linear-gradient(180deg,#f8fafc,#eef2ff);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at top, #eef2ff, #f8fafc);
+  color: #111827;
 }
 
-/* HEADER */
+.container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 30px 20px;
+}
+
+/* ===== HEADER ===== */
+
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 25px;
 }
 
-/* CONTAINER */
-.container {
-  max-width: 1000px;
-  margin: auto;
-  padding: 32px;
+.avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* CARDS */
+/* ===== CARDS ===== */
+
 .card {
-  background: white;
-  border-radius: 16px;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(14px);
+  border-radius: 18px;
   padding: 20px;
-  margin-top: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
-  transition: all .2s ease;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
 }
 
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.08);
+.card h3 {
+  margin-top: 0;
 }
 
-/* BUTTONS */
+/* ===== BUTTONS ===== */
+
 button {
+  background: linear-gradient(135deg,#6366f1,#4f46e5);
+  border: none;
+  color: white;
   padding: 8px 14px;
   border-radius: 10px;
-  border: none;
-  background: #2563eb;
-  color: white;
-  margin-right: 6px;
   cursor: pointer;
+  margin-right: 6px;
+  margin-top: 6px;
   font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 button:hover {
-  background: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99,102,241,0.4);
 }
 
-/* AVATAR */
-.avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 2px solid #e5e7eb;
+button:active {
+  transform: scale(0.97);
 }
 
-/* AUTH */
-.auth-wrapper {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.auth-card {
-  background: white;
-  padding: 40px;
-  border-radius: 18px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-}
+/* ===== INPUTS ===== */
 
 input, textarea {
   width: 100%;
-  padding: 12px;
-  margin-top: 8px;
+  padding: 10px;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+textarea {
+  min-height: 80px;
+}
+
+/* ===== LOGIN LAMP EFFECT ===== */
+
+.lamp-auth-wrapper {
+  min-height: 100vh;
+  background: #0b1220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.lamp-light {
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(circle,
+    rgba(255,255,255,0.18),
+    rgba(255,255,255,0.06),
+    transparent 70%);
+  filter: blur(120px);
+}
+
+.lamp-card {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  padding: 40px;
+  border-radius: 18px;
+  width: 320px;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.lamp-title {
+  color: white;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.lamp-input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+  color: white;
+  background: linear-gradient(90deg,#6366f1,#8b5cf6);
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px rgba(99,102,241,0.5);
+}
+
+.login-btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ===== UPGRADED INTERACTIVE LAMP ===== */
+
+.lamp-auth-wrapper{
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#070b18;
+  position:relative;
+  overflow:hidden;
+}
+
+/* spotlight glow */
+.lamp-light{
+  position:absolute;
+  width:900px;
+  height:900px;
+  border-radius:50%;
+  background: radial-gradient(circle,
+    rgba(255,255,255,0.25),
+    rgba(255,255,255,0.08),
+    transparent 70%);
+  filter: blur(120px);
+  pointer-events:none;
+  transition: transform .15s linear;
+  animation: breathe 6s ease-in-out infinite;
+}
+
+@keyframes breathe{
+  0%,100%{opacity:.7}
+  50%{opacity:1}
+}
+
+/* floating dust particles */
+.lamp-auth-wrapper::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    radial-gradient(rgba(255,255,255,.15) 1px, transparent 1px);
+  background-size:40px 40px;
+  animation: drift 50s linear infinite;
+}
+
+@keyframes drift{
+  from{transform:translateY(0)}
+  to{transform:translateY(-200px)}
+}
+
+.lamp-card{
+  width:340px;
+  padding:40px;
+  border-radius:20px;
+  background:rgba(255,255,255,.05);
+  backdrop-filter: blur(25px);
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.lamp-title{
+  color:white;
+  text-align:center;
+  font-size:24px;
+}
+
+.lamp-input{
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  outline:none;
+  background:rgba(255,255,255,.08);
+  color:white;
+}
+
+.login-btn{
+  width:100%;
+  padding:.9rem;
+  border:none;
+  border-radius:10px;
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  background:linear-gradient(135deg,#7c3aed,#22d3ee);
+  transition:.3s;
+  box-shadow:0 10px 25px rgba(0,0,0,.3);
+}
+
+.login-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 20px 40px rgba(0,0,0,.5);
+}
+
+.login-btn.secondary{
+  background:linear-gradient(135deg,#374151,#1f2937);
 }
