@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+// import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function App(){
 
@@ -149,14 +149,14 @@ export default function App(){
 
   const logout=()=>signOut(auth);
 
-  const uploadPhoto=async e=>{
-    const file=e.target.files[0];
-    if(!file) return;
-    const r=ref(storage,`profiles/${user.uid}`);
-    await uploadBytes(r,file);
-    const url=await getDownloadURL(r);
-    saveUser(subjects,{...profile,photo:url});
-  };
+  // const uploadPhoto=async e=>{
+  //   const file=e.target.files[0];
+  //   if(!file) return;
+  //   const r=ref(storage,`profiles/${user.uid}`);
+  //   await uploadBytes(r,file);
+  //   const url=await getDownloadURL(r);
+  //   saveUser(subjects,{...profile,photo:url});
+  // };
 
   const addBulk=()=>{
     const list=bulk.split("\n").filter(Boolean);
@@ -240,7 +240,7 @@ export default function App(){
         </div>
 
         <div>
-          <button onClick={()=>setEditing(!editing)}>Edit Profile</button>
+          {/* <button onClick={()=>setEditing(!editing)}>Edit Profile</button> */}
           <button onClick={logout}>Logout</button>
         </div>
       </div>
@@ -248,7 +248,7 @@ export default function App(){
       {editing && (
         <div className="card">
           <input value={profile.name} onChange={e=>setProfile({...profile,name:e.target.value})}/>
-          <input type="file" accept="image/png,image/jpeg" onChange={uploadPhoto}/>
+          {/* <input type="file" accept="image/png,image/jpeg" onChange={uploadPhoto}></input> */}
           <button onClick={()=>saveUser()}>Save</button>
         </div>
       )}
